@@ -116,7 +116,7 @@ func handler(w http.ResponseWriter, req *http.Request) {
 	if event == "assigned" {
 		toNotify, number, title = fromAssigned(request)
 		readableEvent = "You were assigned"
-	} else if event == "created" {
+	} else if event == "submitted" {
 		event = "comments"
 		toNotify, number, title = fromComment(request)
 		readableEvent = "New comments on"
