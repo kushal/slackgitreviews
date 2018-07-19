@@ -30,13 +30,8 @@ func fromAssigned(request *jsontree.JsonTree) ([]string, string, string) {
 	number := strconv.FormatInt(int64(rawNumber), 10)
 
 	var toNotify []string
-	assignees := pullRequest.Get("assignees")
-	numAssignees, _ := assignees.Len()
-
-	for i := 0; i < numAssignees; i++ {
-		assignee, _ := assignees.GetIndex(i).Get("login").String()
-		toNotify = append(toNotify, assignee)
-	}
+	assignee, _ := request.Get("assignee").Get("login").String()
+	toNotify = append(toNotify, assignee)
 
 	title, _ := pullRequest.Get("title").String()
 
