@@ -40,7 +40,7 @@ func fromAssigned(request *jsontree.JsonTree) ([]string, string, string) {
 
 // Parse a "comment" body into parts
 func fromComment(request *jsontree.JsonTree) ([]string, string, string) {
-	issue := request.Get("issue")
+	issue := request.Get("pull_request")
 	rawNumber, _ := issue.Get("number").Number()
 	number := strconv.FormatInt(int64(rawNumber), 10)
 	user, _ := issue.Get("user").Get("login").String()
