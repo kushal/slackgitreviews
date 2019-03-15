@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -23,6 +24,31 @@ func getUserMap() map[string]string {
 	return m
 }
 
+type AsanaWrapper struct {
+	Message AsanaMessage `json:"data"`
+}
+
+type AsanaMessage struct {
+	Text string `json:"text"`
+}
+
+// If there is an asana URL, add comment
+func maybeNotifyAsana(body string, githubUrl string) {
+	r := regexp.MustCompile("https://app.asana.com/0/[0-9]+/([0-9]+)")
+	match := r.FindStringSubmatch(body)
+	if len(match) > 0 {
+		url := "https://app.asana.com/api/1.0/tasks/" + match[1] + "/stories"
+		b := new(bytes.Buffer)
+		json.NewEncoder(b).Encode(AsanaWrapper{Message: AsanaMessage{Text: githubUrl}})
+		client := &http.Client{}
+		req, _ := http.NewRequest("POST", url, b)
+		req.Header.Add("Authorization", "Bearer "+os.Getenv("ASANAKEY"))
+		resp, _ := client.Do(req)
+		defer resp.Body.Close()
+		ioutil.ReadAll(resp.Body)
+	}
+}
+
 // Parse an "assigned" body into parts
 func fromAssigned(request *jsontree.JsonTree) ([]string, string, string) {
 	pullRequest := request.Get("pull_request")
@@ -34,7 +60,11 @@ func fromAssigned(request *jsontree.JsonTree) ([]string, string, string) {
 	toNotify = append(toNotify, assignee)
 
 	title, _ := pullRequest.Get("title").String()
-
+	body, err := pullRequest.Get("body").String()
+	if err == nil {
+		htmlUrl, _ := pullRequest.Get("html_url").String()
+		maybeNotifyAsana(body, htmlUrl)
+	}
 	return toNotify, number, title
 }
 
@@ -63,7 +93,11 @@ func fromComment(request *jsontree.JsonTree) ([]string, string, string) {
 	}
 
 	title, _ := issue.Get("title").String()
-
+	body, err := request.Get("review").Get("body").String()
+	if err == nil {
+		htmlUrl, _ := issue.Get("html_url").String()
+		maybeNotifyAsana(body, htmlUrl)
+	}
 	return toNotify, number, title
 }
 
@@ -74,7 +108,6 @@ type SlackMessage struct {
 
 // Send a message to a recipient id on slack
 func sendMessage(recipient string, reviewUrl string) {
-	fmt.Println("to " + recipient)
 	b := new(bytes.Buffer)
 	json.NewEncoder(b).Encode(SlackMessage{Channel: recipient, Text: reviewUrl})
 	resp, _ := http.Post(os.Getenv("SLACKURL"), "application/json; charset=utf-8", b)
@@ -101,7 +134,7 @@ func handler(w http.ResponseWriter, req *http.Request) {
 	}
 
 	event, _ := request.Get("action").String()
-	fmt.Println("action " + event)
+	fmt.Println("Handling " + event)
 
 	var toNotify []string
 	var number string
