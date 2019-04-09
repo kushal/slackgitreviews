@@ -93,11 +93,6 @@ func fromComment(request *jsontree.JsonTree) ([]string, string, string) {
 	}
 
 	title, _ := issue.Get("title").String()
-	body, err := request.Get("review").Get("body").String()
-	if err == nil {
-		htmlUrl, _ := issue.Get("html_url").String()
-		maybeNotifyAsana(body, htmlUrl)
-	}
 	return toNotify, number, title
 }
 
