@@ -136,9 +136,13 @@ func handler(w http.ResponseWriter, req *http.Request) {
 	var title string
 	var readableEvent string
 
+	repositoryName, _ := request.Get("repository").Get("full_name").String()
+	reviewUrl := "https://reviewable.io/reviews/"+repositoryName+"/"
+
 	if event == "assigned" {
 		toNotify, number, title = fromAssigned(request)
 		readableEvent = "You were assigned"
+		sendMessage("#eng-prs", title+" "+reviewUrl+number)
 	} else if event == "submitted" {
 		event = "comments"
 		toNotify, number, title = fromComment(request)
@@ -146,10 +150,8 @@ func handler(w http.ResponseWriter, req *http.Request) {
 	}
 
 	for _, toNotifyOne := range toNotify {
-		repositoryName, _ := request.Get("repository").Get("full_name").String()
 		recipient := "@" + getUserMap()[toNotifyOne]
-		reviewUrl := "https://reviewable.io/reviews/" + repositoryName + "/" + number
-		sendMessage(recipient, readableEvent+" "+title+" "+reviewUrl)
+		sendMessage(recipient, readableEvent+" "+title+" "+reviewUrl+number)
 	}
 }
 
