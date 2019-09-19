@@ -7,7 +7,6 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
-	"regexp"
 	"strconv"
 	"strings"
 
@@ -24,57 +23,18 @@ func getUserMap() map[string]string {
 	return m
 }
 
-type AsanaWrapper struct {
-	Message AsanaMessage `json:"data"`
-}
-
-type AsanaMessage struct {
-	Text string `json:"text"`
-}
-
-// If there is an asana URL, add comment
-func maybeNotifyAsana(body string, githubUrl string) {
-	r := regexp.MustCompile("https://app.asana.com/0/[0-9]+/([0-9]+)")
-	match := r.FindStringSubmatch(body)
-	if len(match) > 0 {
-		url := "https://app.asana.com/api/1.0/tasks/" + match[1] + "/stories"
-		b := new(bytes.Buffer)
-		json.NewEncoder(b).Encode(AsanaWrapper{Message: AsanaMessage{Text: githubUrl}})
-		client := &http.Client{}
-		req, _ := http.NewRequest("POST", url, b)
-		req.Header.Add("Authorization", "Bearer "+os.Getenv("ASANAKEY"))
-		resp, _ := client.Do(req)
-		defer resp.Body.Close()
-		ioutil.ReadAll(resp.Body)
-	}
-}
-
 // Parse an "assigned" body into parts
-func fromAssigned(request *jsontree.JsonTree) ([]string, string, string) {
-	pullRequest := request.Get("pull_request")
-	rawNumber, _ := pullRequest.Get("number").Number()
-	number := strconv.FormatInt(int64(rawNumber), 10)
-
+func fromAssigned(request *jsontree.JsonTree) []string {
 	var toNotify []string
 	assignee, _ := request.Get("assignee").Get("login").String()
 	toNotify = append(toNotify, assignee)
-
-	title, _ := pullRequest.Get("title").String()
-	body, err := pullRequest.Get("body").String()
-	if err == nil {
-		htmlUrl, _ := pullRequest.Get("html_url").String()
-		maybeNotifyAsana(body, htmlUrl)
-	}
-	return toNotify, number, title
+	return toNotify
 }
 
 // Parse a "comment" body into parts
-func fromComment(request *jsontree.JsonTree) ([]string, string, string) {
+func fromComment(request *jsontree.JsonTree) []string {
 	issue := request.Get("pull_request")
-	rawNumber, _ := issue.Get("number").Number()
-	number := strconv.FormatInt(int64(rawNumber), 10)
 	user, _ := issue.Get("user").Get("login").String()
-
 	sender, _ := request.Get("sender").Get("login").String()
 
 	var toNotify []string
@@ -92,8 +52,7 @@ func fromComment(request *jsontree.JsonTree) ([]string, string, string) {
 		toNotify = append(toNotify, user)
 	}
 
-	title, _ := issue.Get("title").String()
-	return toNotify, number, title
+	return toNotify
 }
 
 type SlackMessage struct {
@@ -132,20 +91,24 @@ func handler(w http.ResponseWriter, req *http.Request) {
 	fmt.Println("Handling " + event)
 
 	var toNotify []string
-	var number string
-	var title string
 	var readableEvent string
 
 	repositoryName, _ := request.Get("repository").Get("full_name").String()
-	reviewUrl := "https://reviewable.io/reviews/"+repositoryName+"/"
+	reviewUrl := "https://reviewable.io/reviews/" + repositoryName + "/"
 
-	if event == "assigned" {
-		toNotify, number, title = fromAssigned(request)
-		readableEvent = "You were assigned"
+	pullRequest := request.Get("pull_request")
+	rawNumber, _ := pullRequest.Get("number").Number()
+	number := strconv.FormatInt(int64(rawNumber), 10)
+	title, _ := pullRequest.Get("title").String()
+
+	if event == "opened" {
 		sendMessage("#eng-prs", title+" "+reviewUrl+number)
+	} else if event == "assigned" {
+		toNotify = fromAssigned(request)
+		readableEvent = "You were assigned"
 	} else if event == "submitted" {
 		event = "comments"
-		toNotify, number, title = fromComment(request)
+		toNotify = fromComment(request)
 		readableEvent = "New comments on"
 	}
 
