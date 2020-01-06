@@ -100,9 +100,10 @@ func handler(w http.ResponseWriter, req *http.Request) {
 	rawNumber, _ := pullRequest.Get("number").Number()
 	number := strconv.FormatInt(int64(rawNumber), 10)
 	title, _ := pullRequest.Get("title").String()
+	user, _ := pullRequest.Get("user").Get("login").String()
 
 	if event == "opened" {
-		sendMessage("#eng-prs", title+" "+reviewUrl+number)
+		sendMessage("#eng-prs", title+" "+reviewUrl+number+" by "+user)
 	} else if event == "assigned" {
 		toNotify = fromAssigned(request)
 		readableEvent = "You were assigned"
@@ -114,7 +115,7 @@ func handler(w http.ResponseWriter, req *http.Request) {
 
 	for _, toNotifyOne := range toNotify {
 		recipient := "@" + getUserMap()[toNotifyOne]
-		sendMessage(recipient, readableEvent+" "+title+" "+reviewUrl+number)
+		sendMessage(recipient, readableEvent+" "+title+" "+reviewUrl+number+" by "+user)
 	}
 }
 
