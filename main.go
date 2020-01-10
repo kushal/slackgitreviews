@@ -52,6 +52,9 @@ func fromComment(request *jsontree.JsonTree) []string {
 		toNotify = append(toNotify, user)
 	}
 
+	if sender == "tryscrollbot" {
+		toNotify = []string{}
+	}
 	return toNotify
 }
 
